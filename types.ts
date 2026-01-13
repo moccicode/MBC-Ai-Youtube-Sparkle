@@ -14,6 +14,16 @@ export interface VideoData {
   ratio: number; // Views / Subscribers * 100
 }
 
+export interface DetailedInfo extends VideoData {
+  description: string;
+  categoryId: string;
+  categoryName?: string;
+  channelPublishedAt: string;
+  channelViewCount: number;
+  channelVideoCount: number;
+  country?: string;
+}
+
 export type SortField = 'viewCount' | 'likeCount' | 'subscriberCount' | 'ratio' | 'publishedAt';
 export type SortOrder = 'asc' | 'desc';
 

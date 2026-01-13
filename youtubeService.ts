@@ -1,16 +1,22 @@
 
-import { VideoData, SearchFilters } from './types';
+import { VideoData, SearchFilters, DetailedInfo } from './types';
 import { parseDuration } from './utils';
 
 const BASE_URL = 'https://www.googleapis.com/youtube/v3';
 
+// 카테고리 ID를 이름으로 매핑하는 간단한 객체
+const categoryMap: Record<string, string> = {
+  "1": "영화/애니메이션", "2": "자동차", "10": "음악", "15": "반려동물/동물", "17": "스포츠",
+  "19": "여행/이벤트", "20": "게임", "22": "인물/브로그", "23": "코미디", "24": "엔터테인먼트",
+  "25": "뉴스/정치", "26": "노하우/스타일", "27": "교육", "28": "과학기술", "29": "비영리/사회운동"
+};
+
 export const fetchYoutubeData = async (
   apiKey: string,
   filters: SearchFilters
-): Promise<VideoData[]> => {
+): Promise<DetailedInfo[]> => {
   const { keyword, date, maxResults, length } = filters;
 
-  // 1. Calculate publishedAfter based on date filter
   let publishedAfter = '';
   const now = new Date();
   if (date === 'today') {
@@ -27,7 +33,6 @@ export const fetchYoutubeData = async (
     publishedAfter = now.toISOString();
   }
 
-  // 2. Search videos
   const searchParams = new URLSearchParams({
     part: 'snippet',
     q: keyword,
@@ -47,7 +52,6 @@ export const fetchYoutubeData = async (
 
   if (!videoIds) return [];
 
-  // 3. Get video statistics & contentDetails (for duration)
   const videoParams = new URLSearchParams({
     part: 'snippet,statistics,contentDetails',
     id: videoIds,
@@ -57,10 +61,9 @@ export const fetchYoutubeData = async (
   const videoRes = await fetch(`${BASE_URL}/videos?${videoParams.toString()}`);
   const videoDetails = await videoRes.json();
 
-  // 4. Get channel details for subscribers
   const channelIds = Array.from(new Set(videoDetails.items.map((v: any) => v.snippet.channelId))).join(',');
   const channelParams = new URLSearchParams({
-    part: 'statistics',
+    part: 'snippet,statistics',
     id: channelIds,
     key: apiKey,
   });
@@ -68,26 +71,35 @@ export const fetchYoutubeData = async (
   const channelRes = await fetch(`${BASE_URL}/channels?${channelParams.toString()}`);
   const channelDetails = await channelRes.json();
 
-  const channelMap = channelDetails.items.reduce((acc: any, item: any) => {
-    acc[item.id] = parseInt(item.statistics.subscriberCount || '0', 10);
+  const channelInfoMap = channelDetails.items.reduce((acc: any, item: any) => {
+    acc[item.id] = {
+      subscribers: parseInt(item.statistics.subscriberCount || '0', 10),
+      publishedAt: item.snippet.publishedAt,
+      viewCount: parseInt(item.statistics.viewCount || '0', 10),
+      videoCount: parseInt(item.statistics.videoCount || '0', 10),
+      country: item.snippet.country || '알 수 없음'
+    };
     return acc;
   }, {});
 
-  // 5. Combine and calculate
-  const results: VideoData[] = videoDetails.items.map((video: any) => {
+  const results: DetailedInfo[] = videoDetails.items.map((video: any) => {
     const vStats = video.statistics;
     const vSnippet = video.snippet;
     const duration = video.contentDetails.duration;
     const durationSeconds = parseDuration(duration);
     const viewCount = parseInt(vStats.viewCount || '0', 10);
     const likeCount = parseInt(vStats.likeCount || '0', 10);
-    const subCount = channelMap[vSnippet.channelId] || 0;
+    const cInfo = channelInfoMap[vSnippet.channelId] || {};
+    const subCount = cInfo.subscribers || 0;
     const ratio = subCount > 0 ? (viewCount / subCount) * 100 : 0;
 
     return {
       id: video.id,
-      thumbnail: vSnippet.thumbnails.medium.url,
+      thumbnail: vSnippet.thumbnails.maxres?.url || vSnippet.thumbnails.high?.url || vSnippet.thumbnails.medium.url,
       title: vSnippet.title,
+      description: vSnippet.description,
+      categoryId: vSnippet.categoryId,
+      categoryName: categoryMap[vSnippet.categoryId] || '기타',
       channelId: vSnippet.channelId,
       channelTitle: vSnippet.channelTitle,
       viewCount,
@@ -97,10 +109,13 @@ export const fetchYoutubeData = async (
       duration: duration,
       durationSeconds,
       ratio,
+      channelPublishedAt: cInfo.publishedAt,
+      channelViewCount: cInfo.viewCount,
+      channelVideoCount: cInfo.videoCount,
+      country: cInfo.country
     };
   });
 
-  // 6. Apply video length filter (done locally as API doesn't support fine-grained duration filtering easily)
   if (length === 'short') {
     return results.filter((v) => v.durationSeconds <= 60);
   } else if (length === 'long') {
