@@ -26,7 +26,9 @@ import {
   Info,
   Layers,
   BarChart3,
-  MousePointer2
+  MousePointer2,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -49,6 +51,7 @@ const App: React.FC = () => {
     date: 'all',
     maxResults: 20
   });
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<DetailedInfo[]>([]);
@@ -132,7 +135,6 @@ const App: React.FC = () => {
     });
   }, [results, sortField, sortOrder]);
 
-  // ESC 키로 모달 닫기
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setSelectedVideo(null);
@@ -141,13 +143,11 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleEsc);
   }, []);
 
-  // --- Components ---
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return <div className="w-4 h-4 opacity-20"><ChevronDown size={18} /></div>;
     return sortOrder === 'asc' ? <ChevronUp size={18} className="text-rose-500" /> : <ChevronDown size={18} className="text-rose-500" />;
   };
 
-  // 인사이트 계산 함수들
   const getInsights = (video: DetailedInfo) => {
     const channelCreated = new Date(video.channelPublishedAt);
     const videoPublished = new Date(video.publishedAt);
@@ -157,9 +157,9 @@ const App: React.FC = () => {
     const videoDays = Math.max(1, (now.getTime() - videoPublished.getTime()) / (1000 * 3600 * 24));
 
     return {
-      avgUploadFreq: (video.channelVideoCount / (channelDays / 30)).toFixed(1), // 월평균 업로드
-      dailyViews: (video.viewCount / videoDays).toFixed(0), // 일평균 조회수
-      annualGrowth: ((video.subscriberCount / (channelDays / 365))).toFixed(0), // 연간 평균 구독자 증가 (단순 계산)
+      avgUploadFreq: (video.channelVideoCount / (channelDays / 30)).toFixed(1),
+      dailyViews: (video.viewCount / videoDays).toFixed(0),
+      annualGrowth: ((video.subscriberCount / (channelDays / 365))).toFixed(0),
     };
   };
 
@@ -292,6 +292,43 @@ const App: React.FC = () => {
           </form>
         </section>
 
+        {/* View Mode Switcher */}
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-10 px-8 gap-6">
+          <div className="flex items-center bg-rose-100/50 p-2 rounded-[1.5rem] border border-rose-200">
+            <button 
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-3 px-8 py-3 rounded-[1.25rem] font-black transition-all ${viewMode === 'grid' ? 'bg-rose-500 text-white shadow-lg' : 'text-rose-400 hover:bg-rose-100'}`}
+            >
+              <LayoutGrid size={20} /> 카드형
+            </button>
+            <button 
+              onClick={() => setViewMode('table')}
+              className={`flex items-center gap-3 px-8 py-3 rounded-[1.25rem] font-black transition-all ${viewMode === 'table' ? 'bg-rose-500 text-white shadow-lg' : 'text-rose-400 hover:bg-rose-100'}`}
+            >
+              <List size={20} /> 테이블형
+            </button>
+          </div>
+
+          <div className="flex items-center gap-6">
+            <span className="text-slate-400 font-bold text-sm">정렬 기준:</span>
+            <div className="flex gap-2">
+              {[
+                { label: '떡상지수', field: 'ratio' as SortField },
+                { label: '조회수', field: 'viewCount' as SortField },
+                { label: '구독자', field: 'subscriberCount' as SortField },
+              ].map((item) => (
+                <button
+                  key={item.field}
+                  onClick={() => toggleSort(item.field)}
+                  className={`px-5 py-2 rounded-full text-xs font-black border transition-all ${sortField === item.field ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-400 border-slate-200 hover:border-rose-300'}`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
         {/* Results Area */}
         <div className="relative min-h-[600px]">
           {isLoading ? (
@@ -300,93 +337,124 @@ const App: React.FC = () => {
                 <div className="w-32 h-32 border-[10px] border-rose-100 border-t-rose-500 rounded-full animate-spin"></div>
                 <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-rose-500" size={48} />
               </div>
-              <p className="text-3xl font-[900] text-rose-500 animate-pulse tracking-tight text-center px-4">
-                마법 지팡이로 분석 중이에요... ✨<br/>
-                <span className="text-xl font-bold text-slate-400 block mt-4">데이터를 정성스럽게 모으는 중!</span>
-              </p>
+              <p className="text-3xl font-[900] text-rose-500 animate-pulse tracking-tight text-center px-4">마법 분석 중... ✨</p>
             </div>
           ) : results.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-32 bg-white rounded-[4rem] border-4 border-dashed border-rose-100 cute-shadow">
-              <div className="bg-rose-50 p-12 rounded-full mb-10 rotate-12 hover:rotate-0 transition-all shadow-inner">
-                <Trophy className="text-rose-300" size={80} />
-              </div>
-              <p className="text-slate-600 font-black text-3xl">아직 분석 결과가 없어요!</p>
-              <p className="text-slate-400 font-bold mt-4 text-xl">어서 검색창에 마법을 걸어보세요! 🍭</p>
+              <Trophy className="text-rose-200 mb-6" size={80} />
+              <p className="text-slate-600 font-black text-2xl">분석할 보물을 찾아주세요!</p>
             </div>
-          ) : (
+          ) : viewMode === 'table' ? (
+            /* Table View */
             <div className="bg-white rounded-[4rem] cute-shadow border border-rose-50 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse table-auto">
                   <thead>
                     <tr className="bg-rose-50/40 text-rose-500 font-black text-sm uppercase tracking-[0.2em] whitespace-nowrap">
                       <th className="px-8 py-10 w-24 text-center">Rank</th>
-                      <th className="px-8 py-10 w-80">Preview (Click!)</th>
+                      <th className="px-8 py-10 w-80">Preview</th>
                       <th className="px-8 py-10 min-w-[450px]">Video & Channel</th>
-                      <th className="px-8 py-10 cursor-pointer hover:bg-rose-100/30 transition-colors" onClick={() => toggleSort('viewCount')}>
-                        <div className="flex items-center gap-2">
-                          <Eye size={20} /> 조회수
-                          <SortIcon field="viewCount" />
-                        </div>
+                      <th className="px-8 py-10 cursor-pointer" onClick={() => toggleSort('viewCount')}>
+                        <div className="flex items-center gap-2">조회수 <SortIcon field="viewCount" /></div>
                       </th>
-                      <th className="px-8 py-10 cursor-pointer hover:bg-rose-100/30 transition-colors bg-rose-500/5" onClick={() => toggleSort('ratio')}>
-                        <div className="flex items-center gap-2 text-rose-600">
-                          <TrendingUp size={24} /> 떡상 지수
-                          <SortIcon field="ratio" />
-                        </div>
+                      <th className="px-8 py-10 cursor-pointer bg-rose-500/5" onClick={() => toggleSort('ratio')}>
+                        <div className="flex items-center gap-2 text-rose-600">떡상 지수 <SortIcon field="ratio" /></div>
                       </th>
-                      <th className="px-8 py-10 cursor-pointer hover:bg-rose-100/30 transition-colors" onClick={() => toggleSort('subscriberCount')}>
-                        <div className="flex items-center gap-2">
-                          <Users size={20} /> 구독자수
-                          <SortIcon field="subscriberCount" />
-                        </div>
+                      <th className="px-8 py-10 cursor-pointer" onClick={() => toggleSort('subscriberCount')}>
+                        <div className="flex items-center gap-2">구독자 <SortIcon field="subscriberCount" /></div>
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-rose-50">
                     {sortedResults.map((video, index) => (
-                      <tr key={video.id} className="hover:bg-rose-50/20 transition-all group sparkle-hover">
+                      <tr key={video.id} className="hover:bg-rose-50/20 transition-all group">
                         <td className="px-8 py-10 text-center font-black">{index + 1}</td>
                         <td className="px-8 py-10">
-                          <div 
-                            onClick={() => setSelectedVideo(video)}
-                            className="relative group cursor-pointer overflow-hidden rounded-[2rem] shadow-xl w-64 aspect-video border-4 border-white transition-all hover:ring-8 hover:ring-rose-100"
-                          >
-                            <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" />
+                          <div onClick={() => setSelectedVideo(video)} className="relative group cursor-pointer overflow-hidden rounded-[2.5rem] shadow-xl w-64 aspect-video border-4 border-white">
+                            <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                             <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors flex items-center justify-center">
-                              <MousePointer2 className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" size={48} />
-                            </div>
-                            <div className="absolute bottom-3 right-3 bg-black/70 text-white text-xs px-3 py-1 rounded-full font-black">
-                              {formatDuration(video.durationSeconds)}
+                              <MousePointer2 className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={48} />
                             </div>
                           </div>
                         </td>
                         <td className="px-8 py-10">
                           <div className="flex flex-col gap-4 max-w-[500px]">
                             <h3 className="text-xl font-black text-slate-800 leading-snug">{video.title}</h3>
-                            <div className="flex items-center gap-3">
-                              <span className="text-sm font-bold px-4 py-1.5 bg-rose-50 text-rose-500 rounded-full border border-rose-100">
-                                {video.channelTitle}
-                              </span>
-                            </div>
+                            <span className="text-sm font-bold px-4 py-1.5 bg-rose-50 text-rose-500 rounded-full border border-rose-100 w-fit">{video.channelTitle}</span>
                           </div>
                         </td>
-                        <td className="px-8 py-10">
-                          <div className="text-2xl font-black text-slate-700">{formatNumber(video.viewCount)}</div>
-                        </td>
+                        <td className="px-8 py-10 font-black text-slate-700">{formatNumber(video.viewCount)}</td>
                         <td className="px-8 py-10 bg-rose-500/5">
-                          <div className={`inline-flex flex-col items-center min-w-[130px] px-8 py-4 rounded-[2rem] ${video.ratio > 100 ? 'bg-rose-500 text-white' : 'bg-white text-rose-600 border-2 border-rose-100 shadow-sm'}`}>
+                          <div className={`inline-flex flex-col items-center min-w-[120px] px-8 py-4 rounded-[2rem] ${video.ratio > 100 ? 'bg-rose-500 text-white' : 'bg-white text-rose-600 border-2 border-rose-100'}`}>
                             <span className="text-3xl font-black">{video.ratio.toFixed(1)}%</span>
-                            <span className="text-[10px] font-black opacity-70 uppercase mt-1">VIRAL INDEX</span>
                           </div>
                         </td>
-                        <td className="px-8 py-10">
-                          <div className="text-xl font-black text-slate-600">{formatNumber(video.subscriberCount)}</div>
-                        </td>
+                        <td className="px-8 py-10 font-black text-slate-600">{formatNumber(video.subscriberCount)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+            </div>
+          ) : (
+            /* Grid View (Card Mode) */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
+              {sortedResults.map((video, index) => (
+                <div key={video.id} className="group bg-white rounded-[3.5rem] cute-shadow border border-rose-50 overflow-hidden flex flex-col hover:scale-[1.03] transition-all duration-500 sparkle-hover">
+                  {/* Thumbnail Wrapper */}
+                  <div className="relative aspect-video overflow-hidden cursor-pointer" onClick={() => setSelectedVideo(video)}>
+                    <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                    <div className="absolute top-6 left-6 flex items-center justify-center w-12 h-12 rounded-[1.25rem] bg-rose-500 text-white font-black text-xl shadow-xl rotate-[-6deg] group-hover:rotate-0 transition-all z-10">
+                      {index + 1}
+                    </div>
+                    <div className="absolute bottom-6 right-6 bg-black/70 backdrop-blur-md text-white text-[10px] font-black px-4 py-1.5 rounded-full z-10">
+                      {formatDuration(video.durationSeconds)}
+                    </div>
+                    <div className="absolute inset-0 bg-rose-500/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="bg-white p-4 rounded-full shadow-2xl scale-0 group-hover:scale-100 transition-transform duration-500">
+                        <Info size={32} className="text-rose-500" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card Content */}
+                  <div className="p-10 flex flex-col flex-1">
+                    <div className="flex-1 space-y-4">
+                      <div className="flex items-center gap-2 text-rose-400 font-bold text-xs uppercase tracking-widest">
+                        <Rocket size={14} /> {video.channelTitle}
+                      </div>
+                      <h3 className="text-xl font-[900] text-slate-800 leading-tight line-clamp-2 h-14 group-hover:text-rose-500 transition-colors">
+                        {video.title}
+                      </h3>
+                    </div>
+
+                    {/* Ratio Badge */}
+                    <div className="my-8 p-6 rounded-[2.5rem] bg-rose-50/50 border-2 border-rose-50 flex flex-col items-center justify-center relative overflow-hidden group/ratio">
+                      <TrendingUp size={60} className="absolute -right-4 -bottom-4 text-rose-100/50 group-hover/ratio:scale-125 transition-transform" />
+                      <span className="text-xs font-black text-rose-400 uppercase tracking-tighter mb-1 relative z-10">Viral Index</span>
+                      <span className={`text-4xl font-[1000] relative z-10 ${video.ratio > 100 ? 'text-rose-600' : 'text-slate-700'}`}>
+                        {video.ratio.toFixed(1)}%
+                      </span>
+                    </div>
+
+                    {/* Stats Footer */}
+                    <div className="flex justify-between items-center pt-6 border-t border-slate-50">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-black text-slate-300 uppercase">Views</span>
+                        <div className="flex items-center gap-1.5 text-sm font-black text-slate-600">
+                          <Eye size={14} /> {formatNumber(video.viewCount)}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1 text-right">
+                        <span className="text-[10px] font-black text-slate-300 uppercase">Subs</span>
+                        <div className="flex items-center gap-1.5 text-sm font-black text-slate-600 justify-end">
+                          <Users size={14} /> {formatNumber(video.subscriberCount)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -396,16 +464,8 @@ const App: React.FC = () => {
       {selectedVideo && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10 animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setSelectedVideo(null)} />
-          
           <div className="relative bg-white w-full max-w-6xl max-h-[90vh] rounded-[3.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row border border-rose-100 animate-in zoom-in-95 duration-300">
-            <button 
-              onClick={() => setSelectedVideo(null)}
-              className="absolute top-6 right-6 z-10 bg-slate-100 hover:bg-rose-500 hover:text-white p-4 rounded-full transition-all shadow-lg active:scale-90"
-            >
-              <X size={28} />
-            </button>
-
-            {/* Left: Media & Header */}
+            <button onClick={() => setSelectedVideo(null)} className="absolute top-6 right-6 z-10 bg-slate-100 hover:bg-rose-500 hover:text-white p-4 rounded-full transition-all shadow-lg active:scale-90"><X size={28} /></button>
             <div className="w-full md:w-2/5 h-[300px] md:h-auto relative overflow-hidden bg-slate-100">
               <img src={selectedVideo.thumbnail} className="w-full h-full object-cover blur-sm opacity-30 absolute inset-0 scale-125" />
               <div className="relative z-10 p-10 h-full flex flex-col justify-center gap-8">
@@ -415,70 +475,36 @@ const App: React.FC = () => {
                 <div className="space-y-4">
                   <h2 className="text-3xl font-[900] text-slate-800 leading-tight">{selectedVideo.title}</h2>
                   <div className="flex flex-wrap gap-2">
-                    <span className="px-4 py-2 bg-rose-500 text-white rounded-full text-sm font-black flex items-center gap-2">
-                      <Layers size={16} /> {selectedVideo.categoryName}
-                    </span>
-                    <span className="px-4 py-2 bg-white/80 backdrop-blur shadow-sm border border-rose-100 rounded-full text-sm font-black text-rose-500 flex items-center gap-2">
-                      <Globe size={16} /> {selectedVideo.country}
-                    </span>
+                    <span className="px-4 py-2 bg-rose-500 text-white rounded-full text-sm font-black flex items-center gap-2"><Layers size={16} /> {selectedVideo.categoryName}</span>
+                    <span className="px-4 py-2 bg-white/80 backdrop-blur shadow-sm border border-rose-100 rounded-full text-sm font-black text-rose-500 flex items-center gap-2"><Globe size={16} /> {selectedVideo.country}</span>
                   </div>
                 </div>
               </div>
             </div>
-
-            {/* Right: Detailed Stats */}
             <div className="flex-1 p-8 md:p-14 overflow-y-auto custom-scrollbar">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-                {/* Channel Box */}
                 <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4">
-                  <div className="flex items-center gap-3 text-rose-500 font-black uppercase tracking-widest text-xs mb-2">
-                    <Rocket size={16} /> Channel Info
-                  </div>
+                  <div className="flex items-center gap-3 text-rose-500 font-black uppercase tracking-widest text-xs mb-2"><Rocket size={16} /> Channel Info</div>
                   <div className="text-2xl font-black text-slate-800">{selectedVideo.channelTitle}</div>
                   <div className="space-y-3 pt-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-400 font-bold">채널 개설일</span>
-                      <span className="text-slate-700 font-black">{formatDate(selectedVideo.channelPublishedAt)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-400 font-bold">총 조회수</span>
-                      <span className="text-slate-700 font-black">{formatNumber(selectedVideo.channelViewCount)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-400 font-bold">영상 개수</span>
-                      <span className="text-slate-700 font-black">{selectedVideo.channelVideoCount}개</span>
-                    </div>
+                    <div className="flex justify-between text-sm"><span className="text-slate-400 font-bold">채널 개설일</span><span className="text-slate-700 font-black">{formatDate(selectedVideo.channelPublishedAt)}</span></div>
+                    <div className="flex justify-between text-sm"><span className="text-slate-400 font-bold">총 조회수</span><span className="text-slate-700 font-black">{formatNumber(selectedVideo.channelViewCount)}</span></div>
+                    <div className="flex justify-between text-sm"><span className="text-slate-400 font-bold">영상 개수</span><span className="text-slate-700 font-black">{selectedVideo.channelVideoCount}개</span></div>
                   </div>
                 </div>
-
-                {/* Insight Box */}
                 <div className="bg-rose-50 p-8 rounded-[2.5rem] border border-rose-100 shadow-sm space-y-4">
-                  <div className="flex items-center gap-3 text-rose-500 font-black uppercase tracking-widest text-xs mb-2">
-                    <BarChart3 size={16} /> Data Insights
-                  </div>
+                  <div className="flex items-center gap-3 text-rose-500 font-black uppercase tracking-widest text-xs mb-2"><BarChart3 size={16} /> Data Insights</div>
                   {(() => {
                     const insights = getInsights(selectedVideo);
                     return (
                       <div className="space-y-4">
-                        <div className="flex flex-col">
-                          <span className="text-xs font-bold text-rose-400 mb-1">월평균 업로드 빈도</span>
-                          <span className="text-2xl font-black text-rose-600">{insights.avgUploadFreq}개 / Month</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-xs font-bold text-rose-400 mb-1">영상 일평균 조회수</span>
-                          <span className="text-2xl font-black text-rose-600">+{insights.dailyViews} views / Day</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-xs font-bold text-rose-400 mb-1">연간 평균 구독자 증가 (추정)</span>
-                          <span className="text-2xl font-black text-rose-600">+{insights.annualGrowth} subs / Year</span>
-                        </div>
+                        <div className="flex flex-col"><span className="text-xs font-bold text-rose-400 mb-1">월평균 업로드 빈도</span><span className="text-2xl font-black text-rose-600">{insights.avgUploadFreq}개 / Month</span></div>
+                        <div className="flex flex-col"><span className="text-xs font-bold text-rose-400 mb-1">영상 일평균 조회수</span><span className="text-2xl font-black text-rose-600">+{insights.dailyViews} views / Day</span></div>
                       </div>
                     );
                   })()}
                 </div>
               </div>
-
-              {/* Quick Stats Row */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
                 {[
                   { icon: Eye, label: '조회수', val: formatNumber(selectedVideo.viewCount), color: 'rose' },
@@ -486,33 +512,20 @@ const App: React.FC = () => {
                   { icon: Users, label: '구독자', val: formatNumber(selectedVideo.subscriberCount), color: 'indigo' },
                   { icon: TrendingUp, label: '떡상지수', val: `${selectedVideo.ratio.toFixed(1)}%`, color: 'emerald' },
                 ].map((stat, i) => (
-                  <div key={i} className="bg-white border-2 border-slate-50 p-6 rounded-[2rem] flex flex-col items-center gap-2 shadow-sm hover:shadow-md transition-shadow">
+                  <div key={i} className="bg-white border-2 border-slate-50 p-6 rounded-[2rem] flex flex-col items-center gap-2 shadow-sm">
                     <stat.icon size={24} className={`text-${stat.color}-400`} />
                     <div className="text-lg font-black text-slate-800">{stat.val}</div>
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{stat.label}</div>
                   </div>
                 ))}
               </div>
-
-              {/* Description Section */}
               <div className="space-y-6">
-                <div className="flex items-center gap-3 text-slate-400 font-black uppercase tracking-widest text-xs">
-                  <Info size={16} /> Video Description
-                </div>
+                <div className="flex items-center gap-3 text-slate-400 font-black uppercase tracking-widest text-xs"><Info size={16} /> Video Description</div>
                 <div className="bg-slate-50 p-10 rounded-[2.5rem] border border-slate-100 relative">
-                   <p className="text-slate-600 leading-relaxed text-base break-words whitespace-pre-wrap line-clamp-[10] hover:line-clamp-none transition-all cursor-help">
-                     {selectedVideo.description || '영상 설명이 없습니다.'}
-                   </p>
+                   <p className="text-slate-600 leading-relaxed text-base break-words whitespace-pre-wrap">{selectedVideo.description || '영상 설명이 없습니다.'}</p>
                    <div className="mt-8 pt-8 border-t border-slate-200 flex justify-between items-center">
                      <div className="text-xs font-bold text-slate-400">게시일: {formatDate(selectedVideo.publishedAt)}</div>
-                     <a 
-                      href={`https://www.youtube.com/watch?v=${selectedVideo.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 px-8 py-4 bg-slate-800 text-white rounded-2xl font-black hover:bg-rose-500 transition-all shadow-xl active:scale-95"
-                     >
-                       <Youtube size={20} /> Youtube에서 보기
-                     </a>
+                     <a href={`https://www.youtube.com/watch?v=${selectedVideo.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-8 py-4 bg-slate-800 text-white rounded-2xl font-black hover:bg-rose-500 transition-all shadow-xl active:scale-95"><Youtube size={20} /> Youtube에서 보기</a>
                    </div>
                 </div>
               </div>
@@ -521,7 +534,16 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Footer (생략 가능, 기존 코드 유지) */}
+      {/* Footer */}
+      <footer className="mt-32 border-t border-rose-100 py-20 bg-white/40">
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <div className="flex justify-center gap-6 mb-10">
+            <Heart className="text-rose-400 animate-pulse fill-rose-400" size={32} />
+            <Sparkles className="text-amber-400 scale-125" size={32} />
+          </div>
+          <p className="text-slate-400 text-xl font-bold">© 2024 YouTube Sparkle ✨</p>
+        </div>
+      </footer>
     </div>
   );
 };
