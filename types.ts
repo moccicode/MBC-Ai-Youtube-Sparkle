@@ -24,6 +24,12 @@ export interface DetailedInfo extends VideoData {
   country?: string;
 }
 
+export interface Favorite {
+  id: string;
+  keyword: string;
+  addedAt: string;
+}
+
 export type SortField = 'viewCount' | 'likeCount' | 'subscriberCount' | 'ratio' | 'publishedAt';
 export type SortOrder = 'asc' | 'desc';
 
