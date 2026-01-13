@@ -1,0 +1,66 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Sparkle ✨ 떡상 탐지기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Gowun+Dodum&family=Gaegu:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+          --brand-rose: #ff85a1;
+          --brand-peach: #fecaca;
+        }
+        body { 
+          font-family: 'Quicksand', 'Gowun Dodum', sans-serif; 
+          background: linear-gradient(135deg, #fff5f7 0%, #fff0f6 100%);
+          letter-spacing: -0.01em;
+        }
+        .cute-shadow {
+          box-shadow: 0 20px 40px -15px rgba(255, 133, 161, 0.2);
+        }
+        .rank-badge {
+          background: linear-gradient(135deg, #ff85a1, #fd3a69);
+          box-shadow: 0 4px 10px rgba(253, 58, 105, 0.3);
+        }
+        .header-gradient {
+          background: linear-gradient(to right, #ffffffcc, #fff5f7cc);
+        }
+        /* Custom scrollbar for a cuter look */
+        ::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+          background: #fff0f6;
+        }
+        ::-webkit-scrollbar-thumb {
+          background: #ffc2d1;
+          border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: #ff85a1;
+        }
+        .sparkle-hover:hover {
+          transform: translateY(-2px) scale(1.02);
+          transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "xlsx": "https://esm.sh/xlsx@^0.18.5"
+  }
+}
+</script>
+</head>
+<body class="text-slate-800 selection:bg-rose-200">
+    <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
+</body>
+</html>
