@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Search, 
   Download, 
@@ -34,7 +34,8 @@ import {
   Bookmark,
   FolderHeart,
   Filter,
-  ArrowUpDown
+  ArrowUpDown,
+  Zap
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -74,6 +75,10 @@ const App: React.FC = () => {
   const [sortField, setSortField] = useState<SortField>('ratio');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [selectedVideo, setSelectedVideo] = useState<DetailedInfo | null>(null);
+
+  // --- Tooltip States ---
+  const [hoveredVideo, setHoveredVideo] = useState<DetailedInfo | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
   // --- Persistence ---
   useEffect(() => {
@@ -185,8 +190,41 @@ const App: React.FC = () => {
     return sortOrder === 'asc' ? <ChevronUp size={18} className="text-rose-500" /> : <ChevronDown size={18} className="text-rose-500" />;
   };
 
+  // --- Tooltip Logic ---
+  const handleMouseMove = (e: React.MouseEvent) => {
+    setTooltipPos({ x: e.clientX, y: e.clientY });
+  };
+
   return (
     <div className={`min-h-screen pb-20 transition-all ${selectedVideo ? 'overflow-hidden' : ''}`}>
+      {/* Tooltip Overlay */}
+      {hoveredVideo && (
+        <div 
+          className="fixed pointer-events-none z-[999] px-6 py-4 bg-slate-900/95 backdrop-blur-md text-white rounded-[1.5rem] shadow-2xl border border-white/10 flex flex-col gap-2 min-w-[220px] animate-in fade-in duration-200"
+          style={{ 
+            left: `${tooltipPos.x + 15}px`, 
+            top: `${tooltipPos.y + 15}px`,
+            maxHeight: '200px'
+          }}
+        >
+          <div className="flex items-center gap-2 mb-1">
+             <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+             <span className="text-[10px] font-black text-rose-300 uppercase tracking-widest">{hoveredVideo.channelTitle}</span>
+          </div>
+          <div className="text-sm font-black line-clamp-2 leading-snug mb-2">{hoveredVideo.title}</div>
+          <div className="grid grid-cols-2 gap-3 border-t border-white/10 pt-3">
+             <div className="flex flex-col">
+               <span className="text-[8px] font-bold text-slate-400 uppercase">조회수</span>
+               <span className="text-xs font-black flex items-center gap-1"><Eye size={10} className="text-rose-400"/> {formatNumber(hoveredVideo.viewCount)}</span>
+             </div>
+             <div className="flex flex-col">
+               <span className="text-[8px] font-bold text-slate-400 uppercase">떡상 지수</span>
+               <span className="text-xs font-black text-rose-400 flex items-center gap-1"><Zap size={10} fill="currentColor"/> {hoveredVideo.ratio.toFixed(1)}%</span>
+             </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="header-gradient backdrop-blur-lg border-b border-rose-100 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -427,7 +465,13 @@ const App: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-rose-50">
                     {displayData.map((video, index) => (
-                      <tr key={video.id} className="hover:bg-rose-50/10 transition-all group">
+                      <tr 
+                        key={video.id} 
+                        className="hover:bg-rose-50/10 transition-all group"
+                        onMouseEnter={() => setHoveredVideo(video)}
+                        onMouseLeave={() => setHoveredVideo(null)}
+                        onMouseMove={handleMouseMove}
+                      >
                         <td className="px-10 py-10 text-center font-black text-slate-400">{index + 1}</td>
                         <td className="px-10 py-10">
                           <div onClick={() => setSelectedVideo(video)} className="relative cursor-pointer overflow-hidden rounded-[1.5rem] shadow-lg aspect-video border-4 border-white sparkle-hover">
@@ -475,7 +519,13 @@ const App: React.FC = () => {
             /* Grid View */
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-12">
               {displayData.map((video, index) => (
-                <div key={video.id} className="group bg-white rounded-[3.5rem] cute-shadow border border-rose-50 overflow-hidden flex flex-col sparkle-hover transition-all duration-500">
+                <div 
+                  key={video.id} 
+                  className="group bg-white rounded-[3.5rem] cute-shadow border border-rose-50 overflow-hidden flex flex-col sparkle-hover transition-all duration-500"
+                  onMouseEnter={() => setHoveredVideo(video)}
+                  onMouseLeave={() => setHoveredVideo(null)}
+                  onMouseMove={handleMouseMove}
+                >
                   <div className="relative aspect-video overflow-hidden">
                     <img 
                       onClick={() => setSelectedVideo(video)} 
